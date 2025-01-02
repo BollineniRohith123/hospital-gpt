@@ -32,7 +32,7 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/query', { query });
+      const response = await axios.post('/api/chat', { query });  // Updated endpoint
       
       // Add AI response with reasoning
       addMessageToConversation(
