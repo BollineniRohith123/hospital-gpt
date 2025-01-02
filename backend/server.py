@@ -87,7 +87,7 @@ def generate_reasoning(query: str, response: str) -> str:
 
 # Medical Query Endpoint
 @app.post("/query", response_model=QueryResponse)
-async def process_medical_query(request: QueryRequest) -> Dict[str, str]:
+async def process_medical_query(request: QueryRequest) -> Dict[str, Any]:
     """
     Process medical queries using RAG Engine.
     
@@ -100,23 +100,31 @@ async def process_medical_query(request: QueryRequest) -> Dict[str, str]:
     try:
         logger.info(f"Processing medical query: {request.query}")
         
-        # Get response from RAG Engine
-        response = rag_engine.get_response(request.query)
+        # Use embeddings to retrieve context
+        try:
+            embedding_context = hospital_embeddings.search_embeddings(request.query)
+            logger.info(f"Retrieved {len(embedding_context)} embedding chunks")
+        except Exception as e:
+            logger.warning(f"Embeddings search failed: {e}")
+            embedding_context = []
         
-        # Ensure consistent response structure
-        if response.get('status') == 'error':
-            raise HTTPException(status_code=500, detail=response.get('response', {}).get('text', 'Unknown error'))
+        # Process query with RAG engine
+        query_result = rag_engine.process_query(request.query)
         
-        # Extract response details
-        response_details = response.get('response', {})
+        # Generate reasoning
+        reasoning = generate_reasoning(request.query, query_result.response)
         
         return {
-            "response": response_details.get('text', ''),
-            "reasoning": response_details.get('reasoning', generate_reasoning(request.query, response_details.get('text', '')))
+            "response": query_result.response,
+            "reasoning": reasoning
         }
+    
     except Exception as e:
         logger.error(f"Error processing medical query: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Internal server error: {str(e)}"
+        )
 
 # Hospital Query Endpoint
 @app.post("/hospital-query")
