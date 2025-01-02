@@ -1,145 +1,99 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
-import { PaperAirplaneIcon, SparklesIcon } from '@heroicons/react/24/solid';
-import Layout from '@/components/Layout';
-import ReasoningDropdown from '@/components/ReasoningDropdown';
-import { useChatContext } from '@/context/ChatContext';
+import React from 'react';
+import Link from 'next/link';
+import { 
+  ChartBarIcon, 
+  ChatBubbleLeftRightIcon, 
+  DocumentTextIcon, 
+  UserGroupIcon 
+} from '@heroicons/react/24/solid';
 
-export default function Home() {
-  const [query, setQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { 
-    conversations, 
-    currentConversationId, 
-    addMessageToConversation 
-  } = useChatContext();
-
-  // Get current conversation's messages
-  const currentConversation = conversations?.find(
-    conv => conv.id === currentConversationId
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
-    // Add user message
-    addMessageToConversation(query, 'user');
-    setQuery('');
-    setIsLoading(true);
-
-    try {
-      const response = await axios.post('http://localhost:8000/query', { query });
-      
-      // Add AI response with reasoning
-      addMessageToConversation(
-        response.data.response, 
-        'assistant', 
-        response.data.reasoning
-      );
-    } catch (error) {
-      console.error('Error querying:', error);
-      addMessageToConversation(
-        'Sorry, something went wrong.', 
-        'assistant'
-      );
-    } finally {
-      setIsLoading(false);
+const HomePage: React.FC = () => {
+  const features = [
+    {
+      name: 'Dashboard',
+      description: 'Comprehensive hospital overview and key metrics',
+      icon: <ChartBarIcon className="w-12 h-12 text-blue-600" />,
+      href: '/dashboard'
+    },
+    {
+      name: 'Medical Assistant',
+      description: 'AI-powered medical consultation and insights',
+      icon: <ChatBubbleLeftRightIcon className="w-12 h-12 text-green-600" />,
+      href: '/chat'
+    },
+    {
+      name: 'Medical Reports',
+      description: 'Detailed patient and hospital documentation',
+      icon: <DocumentTextIcon className="w-12 h-12 text-purple-600" />,
+      href: '/reports'
+    },
+    {
+      name: 'Patient Management',
+      description: 'Comprehensive patient tracking system',
+      icon: <UserGroupIcon className="w-12 h-12 text-red-600" />,
+      href: '/patients'
     }
-  };
+  ];
 
   return (
-    <Layout>
-      {/* Chat Messages Container */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
-        {currentConversation?.messages.length === 0 && (
-          <div className="h-full flex flex-col justify-center items-center text-center text-gray-400">
-            <SparklesIcon className="h-16 w-16 text-blue-300 mb-4" />
-            <h2 className="text-2xl font-semibold mb-2">
-              Welcome to Medical GPT
-            </h2>
-            <p className="max-w-md">
-              Start a new consultation by typing a medical question below.
-              Our AI assistant is ready to help you with medical insights.
-            </p>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <header className="bg-white shadow-md p-6">
+        <div className="container mx-auto flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <img 
+              src="/hospital-logo.svg" 
+              alt="Hospital Logo" 
+              className="w-12 h-12"
+            />
+            <h1 className="text-2xl font-bold text-gray-800">
+              Metropolitan Advanced Medical Center
+            </h1>
           </div>
-        )}
-
-        <AnimatePresence>
-          {currentConversation?.messages.map((msg, index) => (
-            <motion.div 
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div 
-                className={`
-                  max-w-xl p-4 rounded-2xl 
-                  ${msg.role === 'user' 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-gray-100 text-gray-800'}
-                  flex flex-col shadow-md
-                `}
-              >
-                <div className="mb-2">{msg.content}</div>
-                
-                {/* Reasoning Dropdown for AI messages */}
-                {msg.role === 'assistant' && (
-                  <ReasoningDropdown reasoning={msg.markdownContent} />
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex justify-start"
-          >
-            <div className="bg-gray-100 p-4 rounded-2xl flex items-center">
-              <div className="animate-pulse mr-2">
-                <div className="h-2 w-2 bg-gray-400 rounded-full"></div>
-              </div>
-              <span className="text-gray-600">Thinking...</span>
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      {/* Input Area */}
-      <motion.form 
-        onSubmit={handleSubmit} 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="p-6 bg-white border-t border-gray-200"
-      >
-        <div className="flex space-x-2 relative">
-          <input 
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask a medical question..."
-            className="flex-1 p-3 pl-4 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-          <motion.button 
-            type="submit" 
-            disabled={isLoading}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 disabled:opacity-50 transition-all duration-300"
-          >
-            <PaperAirplaneIcon className="h-5 w-5" />
-          </motion.button>
         </div>
-      </motion.form>
-    </Layout>
+      </header>
+
+      <main className="flex-grow container mx-auto px-4 py-12">
+        <section className="text-center mb-12">
+          <h2 className="text-4xl font-bold text-gray-800 mb-4">
+            Welcome to Our Advanced Medical Platform
+          </h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Innovative healthcare solutions powered by cutting-edge technology
+          </p>
+        </section>
+
+        <div className="grid grid-cols-2 gap-8">
+          {features.map((feature, index) => (
+            <Link 
+              key={index} 
+              href={feature.href}
+              className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all group"
+            >
+              <div className="flex items-center space-x-6">
+                {feature.icon}
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                    {feature.name}
+                  </h3>
+                  <p className="text-gray-600 mt-2">
+                    {feature.description}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </main>
+
+      <footer className="bg-white shadow-md p-6 text-center">
+        <p className="text-gray-600">
+          2025 Metropolitan Advanced Medical Center. All rights reserved.
+        </p>
+      </footer>
+    </div>
   );
-}
+};
+
+export default HomePage;
