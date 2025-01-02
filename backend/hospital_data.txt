@@ -1,0 +1,66 @@
+HOSPITAL DATA: City Central Memorial Hospital
+
+WARD AVAILABILITY:
+General Ward: 45/60 beds occupied
+ICU Ward: 12/20 beds occupied
+Pediatric Ward: 8/15 beds occupied
+Orthopedic Ward: 20/25 beds occupied
+Oncology Ward: 15/18 beds occupied
+
+STAFF SCHEDULES:
+Radiology Department:
+- General Shift (06:00-14:00):
+  * Dr. Emily Chen
+  * Technician Mark Rodriguez
+  * Nurse Sarah Thompson
+- Morning Shift (08:00-16:00):
+  * Dr. Michael Lee
+  * Technician Alex Wong
+- Evening Shift (14:00-22:00):
+  * Dr. Rachel Kim
+  * Technician David Garcia
+
+DEATH RATES:
+2024-01-30: 3 deaths
+2024-02-15: 2 deaths
+2024-03-10: 4 deaths
+2024-04-05: 1 death
+2024-05-20: 2 deaths
+
+TREATMENT OUTCOMES:
+Paracetamol Study (2019):
+- Total Participants: 500
+- Effectiveness Rate: 87.5%
+- Side Effects: 12.3%
+- Recommended Dosage: 500mg every 6 hours
+- Key Findings: Significant pain reduction in 75% of patients
+
+COVID-19 Treatment Study (2020-2021):
+- Total Patients: 1200
+- Recovery Rate: 92.4%
+- ICU Admission Rate: 8.6%
+- Mortality Rate: 3.2%
+
+DEPARTMENT STATISTICS:
+Emergency Department:
+- Average Daily Patients: 120
+- Critical Cases: 15-20 per day
+- Average Wait Time: 45 minutes
+
+Surgical Department:
+- Monthly Surgeries: 250-300
+- Most Common Procedures:
+  * Appendectomy
+  * Hernia Repair
+  * Knee Arthroscopy
+
+MEDICAL RESEARCH:
+Ongoing Clinical Trials:
+1. Cancer Immunotherapy (Phase III)
+2. Diabetes Management Protocol
+3. Cardiac Rehabilitation Program
+
+HOSPITAL CONTACT INFORMATION:
+- Main Phone: (555) 123-4567
+- Emergency Hotline: (555) 987-6543
+- Address: 123 Health Avenue, Metropolis, MH 54321
