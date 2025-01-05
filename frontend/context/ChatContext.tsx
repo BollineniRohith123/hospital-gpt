@@ -17,6 +17,9 @@ export interface Message {
   content: string;
   markdownContent?: string;
   timestamp: number;
+  medicalContext?: MedicalContext;
+  confidence?: number;
+  sources?: string[];
 }
 
 export interface Conversation {
@@ -24,16 +27,30 @@ export interface Conversation {
   title: string;
   messages: Message[];
   createdAt: number;
+  department?: string;
+  medicalCategory?: string;
+  relevantMetrics?: Record<string, any>;
+}
+
+interface MedicalContext {
+  department?: string;
+  specialty?: string;
+  urgency?: 'low' | 'medium' | 'high';
+  relatedDocs?: string[];
 }
 
 interface ChatContextType {
   conversations: Conversation[];
   currentConversationId: string | null;
-  addMessageToConversation: (content: string, role: 'user' | 'assistant', markdownContent?: string) => void;
+  addMessageToConversation: (content: string, role: 'user' | 'assistant', markdownContent?: string, medicalContext?: MedicalContext) => void;
   startNewChat: () => void;
   selectConversation: (conversationId: string) => void;
   deleteConversation: (conversationId: string) => void;
   renameConversation: (conversationId: string, newTitle: string) => void;
+  addMedicalContext: (messageId: string, context: MedicalContext) => void;
+  getDepartmentHistory: (department: string) => Message[];
+  getRelevantMetrics: (conversationId: string) => Record<string, any>;
+  categorizeConversation: (conversationId: string, category: string) => void;
 }
 
 // Create the context
@@ -62,18 +79,23 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return conversations[0].id;
   });
 
+  const [medicalMetrics, setMedicalMetrics] = useState<Record<string, any>>({});
+
   // Ensure client-side rendering
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   // Function to create a new conversation
-  function createNewConversation(): Conversation {
+  function createNewConversation(department?: string): Conversation {
     const newConversation: Conversation = {
       id: uuidv4(),
       title: `New Chat ${new Date().toLocaleString()}`,
       messages: [],
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      department,
+      medicalCategory: 'general',
+      relevantMetrics: {}
     };
     return newConversation;
   }
@@ -93,7 +115,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [currentConversationId, isClient]);
 
   // Add a message to the current conversation
-  const addMessageToConversation = useCallback((content: string, role: 'user' | 'assistant', markdownContent?: string) => {
+  const addMessageToConversation = useCallback((
+    content: string, 
+    role: 'user' | 'assistant', 
+    markdownContent?: string,
+    medicalContext?: MedicalContext
+  ) => {
     setConversations(prevConversations => 
       prevConversations.map(conv => 
         conv.id === currentConversationId 
@@ -106,6 +133,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   role, 
                   content, 
                   markdownContent, 
+                  medicalContext,
                   timestamp: Date.now() 
                 }
               ]
@@ -158,6 +186,44 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
   }, []);
 
+  // Add medical context to a message
+  const addMedicalContext = useCallback((messageId: string, context: MedicalContext) => {
+    setConversations(prev => 
+      prev.map(conv => ({
+        ...conv,
+        messages: conv.messages.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, medicalContext: context }
+            : msg
+        )
+      }))
+    );
+  }, []);
+
+  // Get message history for a specific department
+  const getDepartmentHistory = useCallback((department: string): Message[] => {
+    return conversations.flatMap(conv => 
+      conv.department === department ? conv.messages : []
+    );
+  }, [conversations]);
+
+  // Get relevant metrics for a conversation
+  const getRelevantMetrics = useCallback((conversationId: string) => {
+    const conversation = conversations.find(conv => conv.id === conversationId);
+    return conversation?.relevantMetrics || {};
+  }, [conversations]);
+
+  // Categorize a conversation
+  const categorizeConversation = useCallback((conversationId: string, category: string) => {
+    setConversations(prev => 
+      prev.map(conv => 
+        conv.id === conversationId 
+          ? { ...conv, medicalCategory: category }
+          : conv
+      )
+    );
+  }, []);
+
   // Prevent rendering on server
   if (!isClient) {
     return null;
@@ -172,7 +238,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         startNewChat, 
         selectConversation,
         deleteConversation,
-        renameConversation
+        renameConversation,
+        addMedicalContext,
+        getDepartmentHistory,
+        getRelevantMetrics,
+        categorizeConversation
       }}
     >
       {children}

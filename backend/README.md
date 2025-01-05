@@ -44,39 +44,51 @@ agentic_rag/
 
 ## Installation
 
-1. Create a virtual environment:
+1. Clone the repository:
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+git clone https://github.com/AndrewNgo-ini/agentic_rag.git
+cd agentic_rag
 ```
 
-2. Install backend dependencies:
+2. Create and activate a virtual environment (recommended):
 ```bash
-pip install -r backend/requirements.txt
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Set up environment variables:
+```bash
+cp .env.sample .env
+```
+Then edit `.env` with your configuration:
+```
+OPENAI_API_KEY=your-api-key-here
+OPENAI_MODEL=gpt-4o-mini  # or another compatible model
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small # or another compatible model
 ```
 
 ## Running the Application
 
-### Backend Setup
-1. Ensure you are in the project root directory and virtual environment is activated
-
-2. Start the FastAPI backend:
+1. Start the backend server:
 ```bash
 cd backend
-uvicorn server:app --reload
+python server.py
 ```
-The backend will be available at `http://localhost:8000`
 
-### Frontend Setup
-1. Open the `index.html` file directly in your web browser
-   - No additional setup required for the frontend
-   - Recommended browsers: Chrome, Firefox, Safari
+2. Access the frontend:
+- Option 1: Open `frontend/index.html` directly in your web browser
+- Option 2: Serve using Python's built-in server:
+```bash
+cd frontend
+python -m http.server 3000
+```
 
-## Environment Variables
-Create a `.env` file in the backend directory with the following variables:
-```
-OPENAI_API_KEY=your_openai_api_key_here
-```
+Then visit http://localhost:3000 in your browser.
 
 ## Usage
 
@@ -113,7 +125,7 @@ The application includes comprehensive error handling:
 2. Create a feature branch: `git checkout -b feature-name`
 3. Commit your changes: `git commit -am 'Add feature'`
 4. Push to the branch: `git push origin feature-name`
-5. Submit a pull request
+5. Submit a pull request dd
 
 Please ensure your code:
 - Includes appropriate tests
@@ -151,11 +163,6 @@ Common issues and solutions:
    - Ensure input text is not empty
    - Check for proper text encoding
    - Verify numpy installation
-
-4. **Python Version**
-   - Ensure Python 3.11+ is installed
-   - Check that all dependencies are correctly installed
-   - Verify your OpenAI API key is valid and has sufficient credits
 
 ## Acknowledgments
 
