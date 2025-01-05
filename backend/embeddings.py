@@ -138,11 +138,8 @@ class HospitalEmbeddings:
             with open(self.hospital_data_path, 'r') as f:
                 content = f.read()
             
-            # Split content into meaningful chunks
-            chunks = [
-                chunk.strip() for chunk in content.split('\n\n') 
-                if chunk.strip() and len(chunk.strip()) > 50
-            ]
+            # Preprocess text into chunks
+            chunks = self._preprocess_text(content)
             
             # Generate embeddings
             embeddings = self._generate_embeddings(chunks)
@@ -189,28 +186,7 @@ class HospitalEmbeddings:
                 raw_text = f.read()
             
             # Preprocess text into chunks
-            # Split by sections and subsections
-            text_chunks = re.split(
-                r'\n\n(?=[A-Z][A-Z\s]+:|\*\s*[A-Z])', 
-                raw_text
-            )
-            
-            # Filter and clean chunks
-            chunks = []
-            for chunk in text_chunks:
-                # Remove empty lines and trim
-                chunk = '\n'.join(
-                    line.strip() 
-                    for line in chunk.split('\n') 
-                    if line.strip()
-                )
-                
-                # Skip very short chunks
-                if len(chunk) > 20:
-                    chunks.append(chunk)
-            
-            # Log chunk information
-            self.logger.info(f"Generated {len(chunks)} text chunks for embeddings")
+            chunks = self._preprocess_text(raw_text)
             
             # Generate embeddings
             embeddings = self._generate_embeddings(chunks)
@@ -259,85 +235,74 @@ class HospitalEmbeddings:
                 self.index = None
                 self.embeddings_cache = {'chunks': [], 'embeddings': []}
     
-    def search_embeddings(self, query: str, top_k: int = 5) -> List[str]:
+    def search_embeddings(self, query: str, top_k: int = 3) -> List[str]:
         """
-        Search embeddings for most relevant chunks
+        Search embeddings for most relevant context chunks
         
         Args:
-            query (str): Search query
-            top_k (int, optional): Number of top results to return
+            query (str): User's input query
+            top_k (int): Number of top relevant chunks to return
         
         Returns:
-            List[str]: Most relevant text chunks
+            List of most relevant context chunks
         """
         try:
-            # Validate embeddings index and cache
-            if not hasattr(self, 'index') or self.index is None:
-                self.logger.warning("FAISS index not initialized. Reinitializing...")
-                self.initialize_embeddings()
-            
-            # Validate embeddings cache
-            chunks = self.embeddings_cache.get('chunks', [])
-            if not chunks:
-                self.logger.warning("Embeddings cache is empty. Using fallback method.")
-                return self._fallback_search(query, top_k)
-            
-            # Generate query embedding
+            # Generate embedding for the query
             query_embedding = self._generate_embeddings([query])[0]
             
-            # Search FAISS index
-            D, I = self.index.search(np.array([query_embedding]), top_k)
+            # Ensure index is loaded
+            if not os.path.exists(self.index_path):
+                self.update_embeddings()
             
-            # Log search details
-            self.logger.info(f"Embedding search for query: '{query}'")
-            self.logger.info(f"Top {top_k} results - Distances: {D[0]}")
+            # Load FAISS index
+            index = faiss.read_index(self.index_path)
             
-            # Retrieve chunks, filtering out low-relevance results
+            # Perform similarity search
+            distances, indices = index.search(
+                np.array([query_embedding]), 
+                min(top_k, index.ntotal)
+            )
+            
+            # Get chunks from cache
+            cache_data = self._load_embeddings_cache()
+            chunks = cache_data.get('chunks', [])
+            
+            if not chunks:
+                self.logger.warning("No chunks found in cache")
+                return []
+            
+            # Get relevant chunks
             relevant_chunks = []
-            for i, distance in zip(I[0], D[0]):
-                if distance < 1.0:  # Adjust threshold as needed
-                    relevant_chunks.append(chunks[i])
+            for idx in indices[0]:
+                if idx < len(chunks):
+                    relevant_chunks.append(chunks[idx])
             
-            # Fallback if no relevant chunks found
-            if not relevant_chunks:
-                self.logger.warning(f"No relevant chunks found for query: '{query}'. Using fallback.")
-                return self._fallback_search(query, top_k)
-            
+            self.logger.info(f"Found {len(relevant_chunks)} relevant chunks")
             return relevant_chunks
-        
+            
         except Exception as e:
-            self.logger.error(f"Error searching embeddings: {e}")
-            return self._fallback_search(query, top_k)
-    
-    def _fallback_search(self, query: str, top_k: int = 5) -> List[str]:
-        """
-        Fallback search method when embeddings search fails
-        
-        Args:
-            query (str): Search query
-            top_k (int, optional): Number of top results to return
-        
-        Returns:
-            List[str]: Most relevant text chunks based on keywords
-        """
-        # Predefined fallback chunks with high-level hospital information
-        fallback_chunks = [
-            "Total Hospital Bed Capacity: 750 beds across 18 specialized departments",
-            "Hospital Infrastructure: 210 hospital rooms with state-of-the-art medical facilities",
-            "Patient Statistics: 125,000 annual patient admissions, averaging 342 daily admissions",
-            "Departmental Bed Information: Emergency Ward (50 beds), ICU (30 beds), Surgical Ward (100 beds), Pediatric Ward (60 beds)",
-            "Operational Metrics: Overall Bed Occupancy Rate of 72.5%, Average Patient Stay 4.3 days"
-        ]
-        
-        # Keyword-based filtering
-        query_lower = query.lower()
-        keyword_matches = [
-            chunk for chunk in fallback_chunks 
-            if any(keyword in query_lower for keyword in ['bed', 'beds', 'available', 'capacity', 'room'])
-        ]
-        
-        # Return top k matches or all matches
-        return keyword_matches[:top_k] if keyword_matches else fallback_chunks[:top_k]
+            self.logger.error(f"Search embeddings error: {e}")
+            return []
+
+    def _preprocess_text(self, text: str) -> List[str]:
+        """Improved text preprocessing for better chunk quality"""
+        try:
+            # Split into substantial sections
+            sections = re.split(r'\n\n(?=[A-Z][A-Z\s]+:|\d+\.)', text)
+            
+            chunks = []
+            for section in sections:
+                # Clean and normalize
+                cleaned = re.sub(r'\s+', ' ', section).strip()
+                if len(cleaned) > 50:  # Only keep meaningful chunks
+                    chunks.append(cleaned)
+            
+            self.logger.info(f"Preprocessed text into {len(chunks)} chunks")
+            return chunks
+            
+        except Exception as e:
+            self.logger.error(f"Text preprocessing error: {e}")
+            return []
 
 # Singleton instance for easy import
 hospital_embeddings = HospitalEmbeddings()

@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 # Load environment variables
 load_dotenv()
@@ -63,6 +63,21 @@ class QueryResponse(BaseModel):
     response: str
     reasoning: Optional[str] = None
 
+class DetailedQueryResponse(BaseModel):
+    response: str
+    reasoning: Optional[str] = None
+    department: Optional[str] = None
+    specialist: Optional[str] = None
+    confidence: Optional[float] = None
+    related_info: Optional[Dict[str, Any]] = None
+
+# Add new response model
+class ResourceManagementResponse(BaseModel):
+    overview: str
+    innovations: List[Dict[str, str]]
+    clinical_leadership: List[Dict[str, str]]
+    metrics: Dict[str, Any]
+
 def generate_reasoning(query: str, response: str) -> str:
     """
     Generate a concise reasoning explanation for the AI's response.
@@ -86,45 +101,25 @@ def generate_reasoning(query: str, response: str) -> str:
         return "Unable to generate detailed reasoning."
 
 # Medical Query Endpoint
-@app.post("/query", response_model=QueryResponse)
-async def process_medical_query(request: QueryRequest) -> Dict[str, Any]:
-    """
-    Process medical queries using RAG Engine.
-    
-    Args:
-        request (QueryRequest): Medical query details
-    
-    Returns:
-        Dict with processed query results
-    """
+@app.post("/query")
+async def process_query(request: QueryRequest):
+    """Process hospital information queries"""
     try:
-        logger.info(f"Processing medical query: {request.query}")
-        
-        # Use embeddings to retrieve context
-        try:
-            embedding_context = hospital_embeddings.search_embeddings(request.query)
-            logger.info(f"Retrieved {len(embedding_context)} embedding chunks")
-        except Exception as e:
-            logger.warning(f"Embeddings search failed: {e}")
-            embedding_context = []
-        
-        # Process query with RAG engine
-        query_result = rag_engine.process_query(request.query)
-        
-        # Generate reasoning
-        reasoning = generate_reasoning(request.query, query_result.response)
+        # Process query through RAG engine
+        result = rag_engine.process_query(request.query)
         
         return {
-            "response": query_result.response,
-            "reasoning": reasoning
+            "status": result.status,
+            "response": result.response,
+            "metadata": {
+                "departments": result.source_info.get("departments", []),
+                "metrics": result.source_info.get("metrics", {}),
+                "sources": result.source_info.get("sources", [])
+            }
         }
-    
     except Exception as e:
-        logger.error(f"Error processing medical query: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Internal server error: {str(e)}"
-        )
+        logger.error(f"Query processing error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Hospital Query Endpoint
 @app.post("/hospital-query")
@@ -241,6 +236,93 @@ async def update_hospital_data(file_path: str = None):
     
     except Exception as e:
         logger.error(f"Error updating hospital data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/enhanced-query", response_model=DetailedQueryResponse)
+async def process_enhanced_query(request: QueryRequest) -> Dict[str, Any]:
+    """
+    Enhanced query processing with detailed context and related information.
+    """
+    try:
+        # Get embeddings context
+        embedding_context = hospital_embeddings.search_embeddings(request.query, top_k=5)
+        
+        # Process with RAG engine
+        result = rag_engine.process_query(request.query)
+        
+        # Extract department and specialist info
+        department_match = re.search(r"Department: ([^\n]+)", result.response)
+        specialist_match = re.search(r"Dr\. [^\n]+", result.response)
+        
+        return {
+            "response": result.response,
+            "reasoning": result.reasoning,
+            "department": department_match.group(1) if department_match else None,
+            "specialist": specialist_match.group(0) if specialist_match else None,
+            "confidence": result.context.get("confidence_score", 0.8),
+            "related_info": {
+                "context_sources": embedding_context[:2],
+                "success_metrics": result.context.get("success_rate"),
+                "available_services": result.context.get("services", [])
+            }
+        }
+    except Exception as e:
+        logger.error(f"Enhanced query processing error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Add new specialized endpoints
+@app.post("/department-info/{department}")
+async def get_department_info(department: str):
+    """Get detailed information about a specific department."""
+    try:
+        query = f"What are the details and metrics for the {department} department?"
+        result = rag_engine.process_query(query)
+        return {
+            "department": department,
+            "info": result.response,
+            "metrics": result.context.get("metrics", {})
+        }
+    except Exception as e:
+        logger.error(f"Department info error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/doctor-info/{doctor_name}")
+async def get_doctor_info(doctor_name: str):
+    """Get detailed information about a specific doctor."""
+    try:
+        query = f"What are the credentials and expertise of Dr. {doctor_name}?"
+        result = rag_engine.process_query(query)
+        return {
+            "doctor_name": doctor_name,
+            "info": result.response,
+            "credentials": result.context.get("credentials", {})
+        }
+    except Exception as e:
+        logger.error(f"Doctor info error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/resource-management", response_model=ResourceManagementResponse)
+async def get_resource_management_info(request: QueryRequest):
+    """
+    Get detailed information about resource management and innovations.
+    """
+    try:
+        # Process query with specialized handling
+        result = rag_engine.process_query(request.query)
+        
+        if isinstance(result.response, dict) and "resource_management" in result.response:
+            return result.response["resource_management"]
+        
+        # Fallback to structured response
+        return {
+            "overview": result.response,
+            "innovations": [],
+            "clinical_leadership": [],
+            "metrics": {}
+        }
+        
+    except Exception as e:
+        logger.error(f"Resource management query error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Global Exception Handler
